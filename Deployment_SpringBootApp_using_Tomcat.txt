@@ -1,0 +1,58 @@
+#!/bin/bash
+
+# Update package information
+sudo apt-get update -y
+
+TOMCAT_VERSION="9.0.65"
+TOMCAT_URL="http://archive.apache.org/dist/tomcat/tomcat-9/v$TOMCAT_VERSION/bin/apache-tomcat-$TOMCAT_VERSION.tar.gz"
+INSTALLATION_DIR="/opt"
+TOMCAT_PATH="/opt/apache-tomcat-$TOMCAT_VERSION"
+NEW_LINE='<user username="admin" password="admin1234" roles="admin-gui, manager-gui"/>'
+TOMCAT_USERS_FILE="$TOMCAT_PATH/conf/tomcat-users.xml"
+
+# Download and extract Tomcat
+cd "$INSTALLATION_DIR" || exit
+sudo wget "$TOMCAT_URL"
+sudo tar -xvf "apache-tomcat-$TOMCAT_VERSION.tar.gz"
+
+# Navigate to Tomcat's conf directory
+cd "$TOMCAT_PATH/conf" || exit
+
+# Append the new line to the file
+echo "$NEW_LINE" | sudo tee -a "$TOMCAT_USERS_FILE" > /dev/null
+
+# Create symbolic links for startup.sh and shutdown.sh
+sudo ln -s "$TOMCAT_PATH/bin/startup.sh" /usr/bin/startTomcat
+sudo ln -s "$TOMCAT_PATH/bin/shutdown.sh" /usr/bin/stopTomcat
+
+# Modify context.xml files to allow all IP addresses
+sudo sed -i 's/<Valve/<\!--Valve/' "$TOMCAT_PATH/webapps/manager/META-INF/context.xml"
+sudo sed -i 's/<Valve/<\!--Valve/' "$TOMCAT_PATH/webapps/host-manager/META-INF/context.xml"
+
+# Install Java and Maven
+sudo apt-get install openjdk-11-jre -y
+sudo apt-get install maven -y
+
+# Stop and start Tomcat to apply changes
+stopTomcat
+startTomcat
+
+# Clone the repository and build the project
+cd /opt
+git clone https://github.com/jaiswaladi246/Petclinic.git
+cd Petclinic
+mvn clean package
+cd target
+
+# Copy the artifact to Tomcat's webapps directory
+cp /opt/Petclinic/target/petclinic.war "$TOMCAT_PATH/webapps/"
+
+# Display the destination file path
+cd "$TOMCAT_PATH/webapps"
+echo "Artifact copied to: $(pwd)"
+
+# Provide instructions for accessing Tomcat and the deployed application
+echo "To access Tomcat, use the public IP of your instance followed by :8080"
+echo "Example: http://PublicIP:8080"
+echo "To access the deployed application, append /petclinic to the Tomcat URL"
+echo "Example: http://PublicIP:8080/petclinic"
